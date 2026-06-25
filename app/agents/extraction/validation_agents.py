@@ -96,13 +96,46 @@ def validate_seller(ocr_seller: str | None, marketplace: str, db: Session, raw_t
             "flags": [f"Seller '{display_name}' accepted under 'Other' marketplace (offline store / other retailer)"]
         }
 
+    seller_lower = ocr_seller.lower().strip() if ocr_seller else ""
+    raw_text_lower = raw_text.lower().strip() if raw_text else ""
+    mkt_lower = marketplace.lower().strip()
+
+    # If the marketplace name itself or its key identifier matches the OCR text, consider it verified
+    match_found = False
+    if mkt_lower:
+        if seller_lower and mkt_lower in seller_lower:
+            match_found = True
+        elif raw_text_lower and mkt_lower in raw_text_lower:
+            match_found = True
+        else:
+            # Check specific key sub-words for multi-word or special marketplaces
+            keywords = []
+            if "reliance" in mkt_lower:
+                keywords = ["reliance"]
+            elif "ambrane" in mkt_lower:
+                keywords = ["ambrane"]
+
+            for kw in keywords:
+                if seller_lower and kw in seller_lower:
+                    match_found = True
+                    break
+                if raw_text_lower and kw in raw_text_lower:
+                    match_found = True
+                    break
+
+    if match_found:
+        display_name = ocr_seller or marketplace
+        return {
+            "risk": 0,
+            "seller_valid": True,
+            "flags": [f"Seller '{display_name}' verified via marketplace match '{marketplace}' in OCR text"]
+        }
+
     rows = (
         db.query(AuthorizedSeller)
         .filter(AuthorizedSeller.marketplace.ilike(marketplace))
         .all()
     )
-
-    seller_lower = ocr_seller.lower().strip() if ocr_seller else ""
 
     for row in rows:
         sim = 0.0

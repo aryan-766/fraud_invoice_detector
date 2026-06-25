@@ -307,6 +307,34 @@ def test_validate_seller_other_marketplace():
     assert "accepted under 'Other' marketplace" in result["flags"][0]
 
 
+def test_validate_seller_marketplace_name_match():
+    """Test that seller is verified if the marketplace name or its key sub-word is found in OCR text."""
+    db_mock = MagicMock()
+    
+    # 1. Marketplace "Amazon" matches raw_text containing "amazon"
+    result = validate_seller(
+        ocr_seller="Unknown Seller",
+        marketplace="Amazon",
+        db=db_mock,
+        raw_text="This is an Amazon.in invoice. Sold by XYZ Retail."
+    )
+    assert result["seller_valid"] is True
+    assert result["risk"] == 0
+    assert "verified via marketplace match" in result["flags"][0]
+
+    # 2. Marketplace "Reliance Digital" matches ocr_seller containing "reliance"
+    result2 = validate_seller(
+        ocr_seller="Reliance Retail Ltd",
+        marketplace="Reliance Digital",
+        db=db_mock,
+        raw_text="Regular tax invoice."
+    )
+    assert result2["seller_valid"] is True
+    assert result2["risk"] == 0
+    assert "verified via marketplace match" in result2["flags"][0]
+
+
+
 def test_check_duplicate_only_invoice_number():
     """Test that check_duplicate only flags duplicates on invoice number, ignoring email and mobile."""
     db_mock = MagicMock()
