@@ -8,7 +8,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from sqlalchemy import (
-    Boolean, Column, DateTime, Float, Integer, String, Text, create_engine
+    Boolean, Column, DateTime, Float, Integer, String, Text, create_engine, text
 )
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -36,6 +36,8 @@ class WarrantyRegistration(Base):
     name           = Column(String(255), nullable=False)
     mobile         = Column(String(20),  nullable=False)
     email          = Column(String(255), nullable=False)
+    allow_contact  = Column(Boolean, default=False)
+    accept_marketing = Column(Boolean, default=False)
     # Product details
     product_name   = Column(String(500), nullable=False)
     marketplace    = Column(String(100), nullable=False)
@@ -84,6 +86,18 @@ def get_db():
 def init_db():
     """Create tables and seed authorized sellers."""
     Base.metadata.create_all(bind=engine)
+
+    # Ensure allow_contact and accept_marketing columns exist
+    with engine.begin() as conn:
+        try:
+            cursor = conn.execute(text("PRAGMA table_info(warranty_registrations)"))
+            columns = [row[1] for row in cursor.fetchall()]
+            if "allow_contact" not in columns:
+                conn.execute(text("ALTER TABLE warranty_registrations ADD COLUMN allow_contact BOOLEAN DEFAULT 0"))
+            if "accept_marketing" not in columns:
+                conn.execute(text("ALTER TABLE warranty_registrations ADD COLUMN accept_marketing BOOLEAN DEFAULT 0"))
+        except Exception:
+            pass
 
     db = SessionLocal()
     try:

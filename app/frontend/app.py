@@ -297,6 +297,10 @@ if page == "🔍 Verify Invoice":
             mobile = st.text_input("Mobile",       placeholder="+91 9876543210")
             email  = st.text_input("Email",        placeholder="abc@example.com")
 
+            st.markdown("**Preferences & Consent**")
+            allow_contact = st.checkbox("Will you allow us to contact you regarding your registration (we'll only use your data for this purpose only)")
+            accept_marketing = st.checkbox("Would you like to accept marketing materials from us?")
+
             st.markdown("**Product Details**")
             # Dropdown containing Ambrane products
             AMBRANE_PRODUCTS = [
@@ -339,10 +343,31 @@ if page == "🔍 Verify Invoice":
     with col_result:
         if submitted:
             # ── Validation ─────────────────────────────────────────────────
+            import re
             errors = []
-            if not name.strip():        errors.append("Name is required.")
-            if not mobile.strip():      errors.append("Mobile is required.")
-            if not email.strip():       errors.append("Email is required.")
+            if not name.strip():
+                errors.append("Name is required.")
+            
+            # Mobile validation
+            mobile_val = mobile.strip()
+            if not mobile_val:
+                errors.append("Mobile is required.")
+            else:
+                mobile_digits = re.sub(r'\D', '', mobile_val)
+                if len(mobile_digits) == 12 and mobile_digits.startswith('91'):
+                    mobile_digits = mobile_digits[2:]
+                elif len(mobile_digits) == 11 and mobile_digits.startswith('0'):
+                    mobile_digits = mobile_digits[1:]
+                if len(mobile_digits) != 10:
+                    errors.append("Mobile number must be a valid 10-digit number.")
+            
+            # Email validation
+            email_val = email.strip().lower()
+            if not email_val:
+                errors.append("Email is required.")
+            elif not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email_val):
+                errors.append("Email must be in a valid format (e.g. user@example.com with a proper '@' symbol).")
+
             if not product_name.strip():errors.append("Product name is required.")
             if invoice_file is None:    errors.append("Please upload an invoice.")
             if not alive:               errors.append("FastAPI server is not running.")
@@ -372,6 +397,8 @@ if page == "🔍 Verify Invoice":
                     "name": name, "mobile": mobile, "email": email,
                     "product_name": product_name, "marketplace": marketplace,
                     "purchase_date": purchase_date,
+                    "allow_contact": str(allow_contact),
+                    "accept_marketing": str(accept_marketing),
                 }
 
                 for i, step in enumerate(steps[:-1]):

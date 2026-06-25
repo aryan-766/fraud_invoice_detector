@@ -3,6 +3,7 @@ app/main.py
 FastAPI application — orchestrates the full invoice verification pipeline.
 """
 import logging
+import re
 import os
 import shutil
 import tempfile
@@ -131,6 +132,8 @@ async def verify_invoice(
     product_name: str        = Form(...),
     marketplace:  str        = Form(...),
     purchase_date:str        = Form(...),
+    allow_contact: bool      = Form(False),
+    accept_marketing: bool   = Form(False),
     # Invoice file
     invoice:      UploadFile = File(...),
     db:           Session    = Depends(get_db),
@@ -139,6 +142,22 @@ async def verify_invoice(
     Full pipeline:
     upload → OCR → Forensics → Product → Seller → Date → Duplicate → Risk → AI
     """
+    # Validate email
+    email_clean = email.strip().lower()
+    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    if not re.match(email_regex, email_clean):
+        raise HTTPException(status_code=400, detail="Invalid email syntax. Please provide a valid email with a proper '@' symbol.")
+
+    # Validate mobile
+    mobile_digits = re.sub(r'\D', '', mobile)
+    if len(mobile_digits) == 12 and mobile_digits.startswith('91'):
+        mobile_digits = mobile_digits[2:]
+    elif len(mobile_digits) == 11 and mobile_digits.startswith('0'):
+        mobile_digits = mobile_digits[1:]
+    
+    if len(mobile_digits) != 10:
+        raise HTTPException(status_code=400, detail="Invalid mobile number. Please provide a proper 10-digit mobile number.")
+
     image_path = _save_upload(invoice)
     all_flags: list[str] = []
 
@@ -176,7 +195,7 @@ async def verify_invoice(
 
         # ── 7. Duplicate detection ─────────────────────────────────────────────
         logger.info("Step 6/6: Duplicate detection")
-        dup_result = check_duplicate(ocr.get("invoice_number"), email, mobile, db)
+        dup_result = check_duplicate(ocr.get("invoice_number"), email_clean, mobile_digits, db)
         all_flags += dup_result["flags"]
 
         # ── 8. Risk engine ─────────────────────────────────────────────────────
@@ -196,8 +215,10 @@ async def verify_invoice(
         # ── 10. Save to DB ─────────────────────────────────────────────────────
         reg = WarrantyRegistration(
             name           = name,
-            mobile         = mobile,
-            email          = email.lower(),
+            mobile         = mobile_digits,
+            email          = email_clean,
+            allow_contact  = allow_contact,
+            accept_marketing = accept_marketing,
             product_name   = product_name,
             marketplace    = marketplace,
             purchase_date  = purchase_date,
