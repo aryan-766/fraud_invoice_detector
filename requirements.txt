@@ -1,0 +1,38 @@
+ # Core API
+fastapi
+uvicorn[standard]
+python-multipart
+aiofiles
+
+ # Database
+sqlalchemy
+
+
+ # Image Processing & Forensics
+Pillow
+opencv-python-headless
+scikit-image
+numpy
+exifread
+
+ # OCR / PDF
+pymupdf
+
+ # Fuzzy Matching
+rapidfuzz
+
+ # AI Decision Agent — Gemini (FREE tier)
+ # Get key: https://aistudio.google.com/apikey
+google-genai
+
+ # Validation
+pydantic
+
+# Frontend
+streamlit
+requests
+
+ # Utilities
+python-dotenv
+httpx
+pytest
