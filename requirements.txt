@@ -1,36 +1,35 @@
 # Core API
-fastapi==0.138.0
-uvicorn[standard]==0.49.0
-python-multipart==0.0.32
-aiofiles==25.1.0
+fastapi
+uvicorn[standard]
+python-multipart
+aiofiles
 
 # Database
-sqlalchemy==2.0.51
+sqlalchemy
 
 # Image Processing & Forensics
-Pillow==12.2.0
-opencv-python-headless==4.13.0.92
-scikit-image==0.26.0
-numpy==2.3.5
-exifread==3.5.1
+Pillow
+opencv-python-headless
+numpy
+exifread
 
 # OCR / PDF
-pymupdf>=1.24.0
+pymupdf
 
 # Fuzzy Matching
-rapidfuzz==3.14.5
+rapidfuzz
 
 # AI Decision Agent — Gemini (FREE tier)
-google-genai==2.10.0
+google-genai
 
 # Validation
-pydantic==2.13.4
+pydantic
 
 # Frontend
-streamlit==1.58.0
-requests==2.34.2
+streamlit
+requests
 
 # Utilities
-python-dotenv==1.2.2
-httpx==0.28.1
-pytest==9.1.1
+python-dotenv
+httpx
+pytest
