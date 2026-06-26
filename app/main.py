@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, Security
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -43,6 +44,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── API Key Security ──────────────────────────────────────────────────────────
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+async def verify_api_key(api_key: str = Security(api_key_header)):
+    expected_key = os.getenv("WARRANTY_API_KEY")
+    if not expected_key:
+        # Bypassed if key is not configured in .env (dev environment default)
+        return api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Forbidden: {API_KEY_NAME} header is missing"
+        )
+    if api_key != expected_key:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Forbidden: Invalid {API_KEY_NAME}"
+        )
+    return api_key
 
 
 @app.on_event("startup")
@@ -122,26 +145,18 @@ async def extract_ocr(invoice: UploadFile = File(...)):
 
 # ── Pipeline ───────────────────────────────────────────────────────────────────
 
-@app.post("/verify", response_model=VerificationResponse)
-async def verify_invoice(
-    # User details
-    name:         str        = Form(...),
-    mobile:       str        = Form(...),
-    email:        str        = Form(...),
-    # Product details
-    product_name: str        = Form(...),
-    marketplace:  str        = Form(...),
-    purchase_date:str        = Form(...),
-    allow_contact: bool      = Form(False),
-    accept_marketing: bool   = Form(False),
-    # Invoice file
-    invoice:      UploadFile = File(...),
-    db:           Session    = Depends(get_db),
-):
-    """
-    Full pipeline:
-    upload → OCR → Forensics → Product → Seller → Date → Duplicate → Risk → AI
-    """
+async def _process_invoice_verification(
+    name:         str,
+    mobile:       str,
+    email:        str,
+    product_name: str,
+    marketplace:  str,
+    purchase_date:str,
+    allow_contact: bool,
+    accept_marketing: bool,
+    invoice:      UploadFile,
+    db:           Session,
+) -> VerificationResponse:
     # Validate email
     email_clean = email.strip().lower()
     email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
@@ -258,6 +273,55 @@ async def verify_invoice(
 
     finally:
         os.unlink(image_path)   # clean up temp file
+
+
+@app.post("/verify", response_model=VerificationResponse)
+async def verify_invoice(
+    name:         str        = Form(...),
+    mobile:       str        = Form(...),
+    email:        str        = Form(...),
+    product_name: str        = Form(...),
+    marketplace:  str        = Form(...),
+    purchase_date:str        = Form(...),
+    allow_contact: bool      = Form(False),
+    accept_marketing: bool   = Form(False),
+    invoice:      UploadFile = File(...),
+    db:           Session    = Depends(get_db),
+):
+    """
+    Public pipeline for Streamlit application / local usage.
+    """
+    return await _process_invoice_verification(
+        name=name, mobile=mobile, email=email,
+        product_name=product_name, marketplace=marketplace,
+        purchase_date=purchase_date, allow_contact=allow_contact,
+        accept_marketing=accept_marketing, invoice=invoice, db=db
+    )
+
+
+@app.post("/api/v1/verify", response_model=VerificationResponse)
+async def verify_invoice_api(
+    name:         str        = Form(...),
+    mobile:       str        = Form(...),
+    email:        str        = Form(...),
+    product_name: str        = Form(...),
+    marketplace:  str        = Form(...),
+    purchase_date:str        = Form(...),
+    allow_contact: bool      = Form(False),
+    accept_marketing: bool   = Form(False),
+    invoice:      UploadFile = File(...),
+    db:           Session    = Depends(get_db),
+    api_key:      str        = Depends(verify_api_key),
+):
+    """
+    Secured pipeline for third-party integrations (requires X-API-Key header).
+    """
+    return await _process_invoice_verification(
+        name=name, mobile=mobile, email=email,
+        product_name=product_name, marketplace=marketplace,
+        purchase_date=purchase_date, allow_contact=allow_contact,
+        accept_marketing=accept_marketing, invoice=invoice, db=db
+    )
 
 
 # ── Health & admin endpoints ───────────────────────────────────────────────────
